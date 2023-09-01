@@ -36,14 +36,28 @@ public class Gaussians
 {
     public int NumGaussians { get; private set; }
     public int SphericalHarmonicsDegree { get; private set; }
+    public int n_SphericalCoeff { get; private set; }
     public List<Gaussian> GaussianList { get; private set; }
 
     public Gaussians(byte[] arrayBuffer)
     {
-        var headerText = System.Text.Encoding.ASCII.GetString(arrayBuffer);
+        // Get header only
+        string endHeaderMarker = "end_header";
+        string byteArrayAsString = System.Text.Encoding.ASCII.GetString(arrayBuffer);
+
+        int endHeaderIndex = byteArrayAsString.IndexOf(endHeaderMarker);
+
+        string headerText = "";
+
+        if (endHeaderIndex >= 0)
+        {
+            headerText = byteArrayAsString.Substring(0, endHeaderIndex + endHeaderMarker.Length);
+        }
+        
         var lines = headerText.Split('\n');
         NumGaussians = 0;
         var propertyTypes = new Dictionary<string, string>();
+
         foreach (var line in lines)
         {
             if (line.StartsWith("element vertex"))
@@ -57,15 +71,17 @@ public class Gaussians
             }
         }
 
-        var vertexData = new Memory<byte>(arrayBuffer).Slice(headerText.Length);
-        SphericalHarmonicsDegree = CalculateSphericalHarmonicsDegree(propertyTypes.Count);
-
+        Memory<byte> vertexData = new Memory<byte>(arrayBuffer, headerText.Length, arrayBuffer.Length - headerText.Length);
+        
+        var nCoeffsPerColor = propertyTypes.Count(prop => prop.Key.StartsWith("f_rest_")) / 3;
+        SphericalHarmonicsDegree = (int)Math.Sqrt(nCoeffsPerColor + 1) - 1;
+        n_SphericalCoeff = CalculateSphericalHarmonicsDegreeCoeff(SphericalHarmonicsDegree);
         var shFeatureOrder = new List<string>();
         for (var rgb = 0; rgb < 3; rgb++)
         {
             shFeatureOrder.Add($"f_dc_{rgb}");
         }
-        var nCoeffsPerColor = propertyTypes.Count(prop => prop.Key.StartsWith("f_rest_")) / 3;
+        
         for (var i = 0; i < nCoeffsPerColor; i++)
         {
             for (var rgb = 0; rgb < 3; rgb++)
@@ -107,20 +123,20 @@ public class Gaussians
         }
     }
 
-    private int CalculateSphericalHarmonicsDegree(int nCoeffs)
+    private int CalculateSphericalHarmonicsDegreeCoeff(int n)
     {
-        switch (nCoeffs)
+        switch (n)
         {
-            case 1:
-                return 0;
-            case 4:
+            case 0:
                 return 1;
-            case 9:
-                return 2;
-            case 16:
-                return 3;
+            case 1:
+                return 4;
+            case 2:
+                return 9;
+            case 3:
+                return 16;
             default:
-                throw new ArgumentException($"Unsupported SH degree: {nCoeffs}");
+                throw new ArgumentException($"Unsupported SH degree: {n}");
         }
     }
 
