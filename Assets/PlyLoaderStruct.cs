@@ -55,6 +55,7 @@ public class GaussiansStruct
         }
 
         var lines = headerText.Split('\n');
+        
         NumGaussians = 0;
         var propertyTypes = new Dictionary<string, string>();
 
@@ -71,7 +72,9 @@ public class GaussiansStruct
             }
         }
 
-        
+        // Limit the number of gaussians
+        int maxGaussians = 50;
+        NumGaussians = Math.Min(maxGaussians, NumGaussians);
 
         Memory<byte> vertexData = new Memory<byte>(arrayBuffer, headerText.Length, arrayBuffer.Length - headerText.Length);
 

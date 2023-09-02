@@ -5,7 +5,6 @@
 #pragma exclude_renderers gles
 
 
-
 float4 ComputeCov3D(float3 log_scale, float4 rot)
 {
     float modifier = 1.0; // Scale modifier
@@ -98,4 +97,59 @@ float3 ComputeCov2D(float3 position, float3 log_scale, float4 rot)
     cov[1][1] += 0.3;
 
     return float3(cov[0][0], cov[0][1], cov[1][1]);
+}
+
+float ndc2pix(float v, uint size)
+{
+    return ((v + 1.0) * float(size) - 1.0) * 0.5;
+}
+
+// spherical harmonic coefficients
+float SH_C0 = 0.28209479177387814;
+float SH_C1 = 0.4886025119029199;
+float SH_C2[] = {
+    1.0925484305920792,
+    -1.0925484305920792,
+    0.31539156525252005,
+    -1.0925484305920792,
+    0.5462742152960396
+}
+
+float SH_C3[] = {
+    -0.5900435899266435,
+    2.890611442640554,
+    -0.4570457994644658,
+    0.3731763325901154,
+    -0.4570457994644658,
+    1.445305721320277,
+    -0.5900435899266435
+}
+
+float3 ComputeColorFromSH(float3 position, float3 sh[16])
+{
+    float3 dir = normalize(position - _WorldSpaceCameraPos);
+    float3 result = _SH_C0 * sh[0];
+
+    float x = dir.x;
+    float y = dir.y;
+    float z = dir.z;
+
+    result += _SH_C1 * (-y * sh[1] + z * sh[2] - x * sh[3]);
+
+    float xx = x * x;
+    float yy = y * y;
+    float zz = z * z;
+    float xy = x * y;
+    float xz = x * z;
+    float yz = y * z;
+
+    result += _SH_C2[0] * xy * sh[4] +
+              _SH_C2[1] * yz * sh[5] +
+              _SH_C2[2] * (2.0 * zz - xx - yy) * sh[6] +
+              _SH_C2[3] * xz * sh[7] +
+              _SH_C2[4] * (xx - yy) * sh[8];
+
+    result += 0.5;
+
+    return max(result, float3(0.0, 0.0, 0.0));
 }

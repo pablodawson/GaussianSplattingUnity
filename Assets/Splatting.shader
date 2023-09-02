@@ -5,6 +5,8 @@ Shader "Custom/Splatting"
         Pass
         {
             CGPROGRAM
+// Upgrade NOTE: excluded shader from DX11 because it uses wrong array syntax (type[size] name)
+#pragma exclude_renderers d3d11
             #pragma vertex vert
             #pragma fragment frag
 
@@ -43,7 +45,7 @@ Shader "Custom/Splatting"
                 float3 ShCoeffs16;
             };
 
-            float2 quadVertices[6] = {
+            static const float2 quadVertices[6] = {
                 float2(-1.0, -1.0),
                 float2(-1.0, 1.0),
                 float2(1.0, -1.0),
@@ -57,7 +59,6 @@ Shader "Custom/Splatting"
             
             uniform uint _BaseVertexIndex;
             uniform float4x4 _ObjectToWorld;
-            uniform float _NumInstances;
 
             v2f vert(uint vertexID: SV_VertexID, uint instanceID : SV_InstanceID)
             {
@@ -87,9 +88,29 @@ Shader "Custom/Splatting"
                 float4 projPosition = UNITY_MATRIX_MV * float4(gaussian.Position, 1.0);
                 projPosition = projPosition / projPosition.w;
                 o.pos = float4(projPosition.xy + 2 * radius_ndc * quadOffset, projPosition.zw);
-                o.color = compute_color_from_sh(_WorldSpaceCameraPos, gaussian.ShCoeffs1); // Full gaussian SH
-                o.uv = radius_px * quadOffset;
+
+                float[16] ShCoeffs;
+
+                ShCoeffs[0] = gaussian.ShCoeffs1.x;
+                ShCoeffs[1] = gaussian.ShCoeffs1.y;
+                ShCoeffs[2] = gaussian.ShCoeffs1.z;
+                ShCoeffs[3] = gaussian.ShCoeffs2.x;
+                ShCoeffs[4] = gaussian.ShCoeffs2.y;
+                ShCoeffs[5] = gaussian.ShCoeffs2.z;
+                ShCoeffs[6] = gaussian.ShCoeffs3.x;
+                ShCoeffs[7] = gaussian.ShCoeffs3.y;
+                ShCoeffs[8] = gaussian.ShCoeffs3.z;
+                ShCoeffs[9] = gaussian.ShCoeffs4.x;
+                ShCoeffs[10] = gaussian.ShCoeffs4.y;
+                ShCoeffs[11] = gaussian.ShCoeffs4.z;
+                ShCoeffs[12] = gaussian.ShCoeffs5.x;
+                ShCoeffs[13] = gaussian.ShCoeffs5.y;
+                ShCoeffs[14] = gaussian.ShCoeffs5.z;
+                ShCoeffs[15] = gaussian.ShCoeffs6.x;
                 
+                o.color = ComputeColorFromSH(_WorldSpaceCameraPos, ShCoeffs);
+                o.uv = radius_px * quadOffset;
+                 
                 return o;
             }
 
@@ -108,9 +129,7 @@ Shader "Custom/Splatting"
 
                 float alpha = min(0.99, opacity * exp(power));
 
-                return float4(i.color * alpha, alpha);
-                
-                //return i.color;
+                return float4(i.color * alpha, alpha);                
             }
             ENDCG
         }

@@ -21,7 +21,7 @@ public class RendererQuads : MonoBehaviour
         gaussians = new GaussiansStruct(File.ReadAllBytes(plyPath));
         Debug.Log("Loaded gaussians");
 
-        // For now sequential. Then needs to be ordered by depth.
+        // For now sequential. Later needs to be ordered by depth.
         int N = gaussians.NumGaussians * 6 ;
         int[] indexData = new int[N];
 
@@ -30,7 +30,9 @@ public class RendererQuads : MonoBehaviour
             indexData[i] = i;
         }
 
+        indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, indexData.Length, 4);
         indexBuffer.SetData(indexData);
+        
     }
     
     void OnDestroy()
@@ -46,6 +48,7 @@ public class RendererQuads : MonoBehaviour
                 DestroyImmediate(_meshMaterial);
             }
         }
+        indexBuffer.Dispose();
     }
 
     void OnRenderObject()
@@ -79,8 +82,7 @@ public class RendererQuads : MonoBehaviour
         rp.matProps.SetInt("n_SphericalCoeff", gaussians.n_SphericalCoeff);
 
         rp.matProps.SetMatrix("_ObjectToWorld", Matrix4x4.Translate(new Vector3(-4.5f, 0, 0)));
-        rp.matProps.SetFloat("_NumInstances", 10.0f);
-
+        
         Graphics.RenderPrimitivesIndexed(rp, MeshTopology.Triangles, indexBuffer, indexBuffer.count, 0 , gaussians.NumGaussians);
     }
 
