@@ -10,7 +10,7 @@ Right now it crashes.
 - [x] Definition of all methods
 - [x] Basic Structure
 - [ ] Sorting Gaussians by Depth
-- [ ] Debugging (making it work)
+- [ ] Debugging (making it not crash/work)
 
       
 # Help wanted!
