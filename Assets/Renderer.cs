@@ -45,13 +45,13 @@ public class Renderer : MonoBehaviour
 
         // Camera params
         Camera mainCamera = Camera.main;
-        // Focal
+
+        tanFovX = Mathf.Tan(mainCamera.fieldOfView * Mathf.Deg2Rad * 0.5f);
+        tanFovY = tanFovX / mainCamera.aspect;
+        
         float focalLengthPixels = Screen.height / (2.0f * Mathf.Tan(mainCamera.fieldOfView * 0.5f * Mathf.Deg2Rad));
         focalX = focalLengthPixels * Screen.width / Screen.height;
         focalY = focalLengthPixels;
-
-        tanFovX = 0.5f * Screen.width / focalX;
-        tanFovY = 0.5f * Screen.height / focalY;
 
     }
     
