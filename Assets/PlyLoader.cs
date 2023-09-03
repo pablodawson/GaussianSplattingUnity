@@ -2,34 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Numerics;
+using System.Runtime.InteropServices;
 
-public class Gaussian
-{
-    public Vector3 Position { get; set; }
-    public Vector3 Scale { get; set; }
-    public Vector4 RotQuat { get; set; }
-    public float Opacity { get; set; }
-    public Vector3[] ShCoeffs { get; set; }
-    public Vector3? CameraSpacePos { get; set; }
-
-    public Gaussian(
-        Vector3 position,
-        Vector3 scale,
-        Vector4 rotQuat,
-        float opacity,
-        Vector3[] shCoeffs,
-        Vector3? cameraSpacePos = null)
-    {
-        Position = position;
-        Scale = scale;
-        RotQuat = rotQuat;
-        Opacity = opacity;
-        ShCoeffs = shCoeffs;
-        CameraSpacePos = cameraSpacePos;
-    }
-}
 
 public class Gaussians
 {
@@ -37,7 +12,12 @@ public class Gaussians
     public int SphericalHarmonicsDegree { get; private set; }
     public int n_SphericalCoeff { get; private set; }
     public int shCoeffs_size { get; private set; }
-    public List<Gaussian> GaussianList { get; private set; }
+    
+    public Vector3[] Position { get; private set; }
+    public Vector3[] Scale { get; private set; }
+    public Vector4[] RotQuat { get; private set; }
+    public float[] Opacity { get; private set; }
+    public Vector3[] ShCoeffs { get; private set; }
 
     public Gaussians(byte[] arrayBuffer)
     {
@@ -53,8 +33,9 @@ public class Gaussians
         {
             headerText = byteArrayAsString.Substring(0, endHeaderIndex + endHeaderMarker.Length);
         }
-        
+
         var lines = headerText.Split('\n');
+        
         NumGaussians = 0;
         var propertyTypes = new Dictionary<string, string>();
 
@@ -71,8 +52,14 @@ public class Gaussians
             }
         }
 
-        Memory<byte> vertexData = new Memory<byte>(arrayBuffer, headerText.Length, arrayBuffer.Length - headerText.Length);
-        
+        // Limit the number of gaussians
+        int maxGaussians = 20000;
+        NumGaussians = Math.Min(maxGaussians, NumGaussians);
+
+        int vertexByteOffset = endHeaderIndex + "end_header".Length + 1;
+
+        Memory<byte> vertexData = new Memory<byte>(arrayBuffer, vertexByteOffset, arrayBuffer.Length - vertexByteOffset);
+
         var nCoeffsPerColor = propertyTypes.Count(prop => prop.Key.StartsWith("f_rest_")) / 3;
         SphericalHarmonicsDegree = (int)Math.Sqrt(nCoeffsPerColor + 1) - 1;
         n_SphericalCoeff = CalculateSphericalHarmonicsDegreeCoeff(SphericalHarmonicsDegree);
@@ -81,7 +68,7 @@ public class Gaussians
         {
             shFeatureOrder.Add($"f_dc_{rgb}");
         }
-        
+
         for (var i = 0; i < nCoeffsPerColor; i++)
         {
             for (var rgb = 0; rgb < 3; rgb++)
@@ -90,7 +77,14 @@ public class Gaussians
             }
         }
 
-        GaussianList = new List<Gaussian>();
+        shCoeffs_size = shFeatureOrder.Count;
+
+        Position = new Vector3[NumGaussians];
+        Scale = new Vector3[NumGaussians];
+        RotQuat = new Vector4[NumGaussians];
+        Opacity = new float[NumGaussians];
+        List<Vector3> ShCoeffsList = new List<Vector3>();
+        
         var offset = 0;
         for (var i = 0; i < NumGaussians; i++)
         {
@@ -101,27 +95,18 @@ public class Gaussians
             var length = (float)Math.Sqrt(rotation.X * rotation.X + rotation.Y * rotation.Y + rotation.Z * rotation.Z + rotation.W * rotation.W);
             rotation /= length;
 
-            //var shCoeffs = shFeatureOrder.Select(feature => rawVertex[feature]).ToList();
-
-            shCoeffs_size = shFeatureOrder.Count / 3;
-            var shCoeffs = new Vector3[shFeatureOrder.Count/3];
-            
-            // Similar to reshape(3,-1)
             for (var j = 0 ; j < shFeatureOrder.Count; j += 3)
             {
-                shCoeffs[j/3] = new Vector3(rawVertex[shFeatureOrder[j]], rawVertex[shFeatureOrder[j + 1]], rawVertex[shFeatureOrder[j + 2]]);
+                Vector3 sh = new Vector3(rawVertex[shFeatureOrder[j]], rawVertex[shFeatureOrder[j + 1]], rawVertex[shFeatureOrder[j + 2]]);
+                ShCoeffsList.Add(sh);
             }
-            
 
-            var gaussian = new Gaussian(
-                new Vector3(rawVertex["x"], rawVertex["y"], rawVertex["z"]),
-                new Vector3((float)Math.Exp(rawVertex["scale_0"]), (float)Math.Exp(rawVertex["scale_1"]), (float)Math.Exp(rawVertex["scale_2"])),
-                rotation,
-                Sigmoid(rawVertex["opacity"]),
-                shCoeffs
-            );
-            GaussianList.Add(gaussian);
+            Position[i] = new Vector3(rawVertex["x"], rawVertex["y"], rawVertex["z"]);
+            Scale[i] = new Vector3((float)Math.Exp(rawVertex["scale_0"]), (float)Math.Exp(rawVertex["scale_1"]), (float)Math.Exp(rawVertex["scale_2"]));
+            RotQuat[i] = rotation;
+            Opacity[i] = Sigmoid(rawVertex["opacity"]);
         }
+        ShCoeffs = ShCoeffsList.ToArray();
     }
 
     private int CalculateSphericalHarmonicsDegreeCoeff(int n)
@@ -141,6 +126,11 @@ public class Gaussians
         }
     }
 
+    private float Sigmoid(float x)
+    {
+        return 1.0f / (1.0f + (float)Math.Exp(-x));
+    }
+
     private Tuple<int, Dictionary<string, float>> ReadRawVertex(int offset, ReadOnlyMemory<byte> vertexData, Dictionary<string, string> propertyTypes)
     {
         var vertex = new Dictionary<string, float>();
@@ -148,20 +138,18 @@ public class Gaussians
         {
             if (propType == "float")
             {
-                vertex[prop] = BitConverter.ToSingle(vertexData.Span.Slice(offset, 4));
-                offset += 4;
+                vertex[prop] = BitConverter.ToSingle(vertexData.Span.Slice(offset));
+
+                offset += sizeof(float);
             }
             else if (propType == "uchar")
             {
                 vertex[prop] = vertexData.Span[offset] / 255.0f;
-                offset += 1;
+                offset += sizeof(byte);
             }
         }
         return new Tuple<int, Dictionary<string, float>>(offset, vertex);
     }
 
-    private float Sigmoid(float x)
-    {
-        return 1.0f / (1.0f + (float)Math.Exp(-x));
-    }
+
 }

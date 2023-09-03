@@ -231,6 +231,7 @@ GameObject:
   - component: {fileID: 667801235}
   - component: {fileID: 667801234}
   - component: {fileID: 667801237}
+  - component: {fileID: 667801238}
   m_Layer: 0
   m_Name: Renderer
   m_TagString: Untagged
@@ -345,6 +346,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _gaussianShader: {fileID: 4800000, guid: 4fe0d51b65844804d817aa5a89f7dfe6, type: 3}
   _meshMaterial: {fileID: 2100000, guid: f9188c2037808e14d8565071c437d609, type: 2}
+--- !u!114 &667801238
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 667801230}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c04c095a675a28a40975111af67a1442, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  material: {fileID: 2100000, guid: f9188c2037808e14d8565071c437d609, type: 2}
+  mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &1710060544
 GameObject:
   m_ObjectHideFlags: 0

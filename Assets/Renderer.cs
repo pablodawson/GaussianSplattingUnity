@@ -5,74 +5,94 @@ using System.IO;
 
 public class Renderer : MonoBehaviour
 {
-    GaussiansStruct gaussians;
+    Gaussians gaussians;
     [SerializeField] Shader _gaussianShader = null;
-    Material _meshMaterial;
-    [SerializeField] Color _pointTint = new Color(0.5f, 0.5f, 0.5f, 1);
+    [SerializeField] Material _meshMaterial;
+
+    GraphicsBuffer indexBuffer;
+    ComputeBuffer posBuffer, scaleBuffer, rotQuatBuffer, opacityBuffer, shCoeffsBuffer, gaussianBuffer;
+    float focalX, focalY, tanFovX, tanFovY;
 
     // Start is called before the first frame update
     void Start()
     {
-        string plyPath = "C:/Users/pablo_7xoop1s/Downloads/point_cloud.ply";
-        gaussians = new GaussiansStruct(File.ReadAllBytes(plyPath));
-        Debug.Log("Loaded gaussians");
-    }
+        string plyPath = "C:/Users/Pablo/Downloads/point_cloud.ply";
+        gaussians = new Gaussians(File.ReadAllBytes(plyPath));
 
+        // Compute Buffers to shader
+        posBuffer = new ComputeBuffer(gaussians.NumGaussians, 3 * sizeof(float));
+        posBuffer.SetData(gaussians.Position);
+        scaleBuffer = new ComputeBuffer(gaussians.NumGaussians, 3 * sizeof(float));
+        scaleBuffer.SetData(gaussians.Scale);
+        rotQuatBuffer = new ComputeBuffer(gaussians.NumGaussians, 4 * sizeof(float));
+        rotQuatBuffer.SetData(gaussians.RotQuat);
+        opacityBuffer = new ComputeBuffer(gaussians.NumGaussians, sizeof(float));
+        opacityBuffer.SetData(gaussians.Opacity);
+        shCoeffsBuffer = new ComputeBuffer(gaussians.NumGaussians * gaussians.shCoeffs_size, 3 * sizeof(float));
+        shCoeffsBuffer.SetData(gaussians.ShCoeffs);
+        
+        // Indexing, for now sequential. Later needs to be ordered by depth.
+        int N = gaussians.NumGaussians * 6 ;
+        int[] indexData = new int[N];
+
+        for (int i = 0; i < N; i++)
+        {
+            indexData[i] = i;
+        }
+
+        indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, indexData.Length, 4);
+        indexBuffer.SetData(indexData);
+
+        // Camera params
+        Camera mainCamera = Camera.main;
+        // Focal
+        float focalLengthPixels = Screen.height / (2.0f * Mathf.Tan(mainCamera.fieldOfView * 0.5f * Mathf.Deg2Rad));
+        focalX = focalLengthPixels * Screen.width / Screen.height;
+        focalY = focalLengthPixels;
+
+        tanFovX = 0.5f * Screen.width / focalX;
+        tanFovY = 0.5f * Screen.height / focalY;
+
+    }
+    
     void OnDestroy()
     {
-        if (_meshMaterial != null)
-        {
-            if (Application.isPlaying)
-            {
-                Destroy(_meshMaterial);
-            }
-            else
-            {
-                DestroyImmediate(_meshMaterial);
-            }
-        }
+        indexBuffer?.Dispose();
     }
 
-    void OnRenderObject()
+    void Update()
     {
         if (gaussians == null) return;
-
-        // Check the camera condition.
-        var camera = Camera.current;
-        if ((camera.cullingMask & (1 << gameObject.layer)) == 0) return;
 
         // Lazy initialization
         if (_meshMaterial == null)
         {
             _meshMaterial = new Material(_gaussianShader);
-            _meshMaterial.hideFlags = HideFlags.DontSave;
-            _meshMaterial.EnableKeyword("_COMPUTE_BUFFER");
         }
+
+        RenderParams rp = new RenderParams(_meshMaterial);
+        rp.worldBounds = new Bounds(Vector3.zero, 10000 * Vector3.one); // use tighter bounds
+
+        rp.matProps = new MaterialPropertyBlock();
+
+        // Pass data to the shader
+        rp.matProps.SetInt("SphericalHarmonicsDegree", gaussians.SphericalHarmonicsDegree);
+        rp.matProps.SetInt("n_SphericalCoeff", gaussians.n_SphericalCoeff);
+        rp.matProps.SetMatrix("_ObjectToWorld", Matrix4x4.Translate(new Vector3(0, 0, 0)));
+
+        //Camera params
+        rp.matProps.SetFloat("focalX", focalX);
+        rp.matProps.SetFloat("focalY", focalY);
+        rp.matProps.SetFloat("tanFovX", tanFovX);
+        rp.matProps.SetFloat("tanFovY", tanFovY);
         
-        _meshMaterial.SetPass(0);
-        _meshMaterial.SetMatrix("_Transform", transform.localToWorldMatrix);
-        _meshMaterial.SetInt("SphericalHarmonicsDegree", gaussians.SphericalHarmonicsDegree);
-        _meshMaterial.SetInt("n_SphericalCoeff", gaussians.n_SphericalCoeff);
-        _meshMaterial.SetFloat("_PointSize", 1f);
-        _meshMaterial.SetColor("_Tint", _pointTint);
+        rp.matProps.SetBuffer("Position", posBuffer);
+        rp.matProps.SetBuffer("Scale", scaleBuffer);
+        rp.matProps.SetBuffer("RotQuat", rotQuatBuffer);
+        rp.matProps.SetBuffer("Opacity", opacityBuffer);
+        rp.matProps.SetBuffer("ShCoeffs", shCoeffsBuffer);
 
-        // Compute Buffers
-        ComputeBuffer gaussianBuffer = new ComputeBuffer(gaussians.NumGaussians, sizeof(float) * (3 + 3 + 4 + 1 + gaussians.shCoeffs_size * 3), ComputeBufferType.Default);
-        gaussianBuffer.SetData(gaussians.gaussianArray);
-        _meshMaterial.SetBuffer("gaussians", gaussianBuffer);
-        gaussianBuffer.Dispose();
-
-
-#if UNITY_2019_1_OR_NEWER
-        Graphics.DrawProceduralNow(MeshTopology.Points, gaussians.NumGaussians, 1);
-#else
-        Graphics.DrawProcedural(MeshTopology.Points, gaussians.NumGaussians, 1);
-#endif
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
+        // Draw
+        Graphics.RenderPrimitivesIndexed(rp, MeshTopology.Triangles, indexBuffer, indexBuffer.count, 0 , gaussians.NumGaussians);
     }
 }
