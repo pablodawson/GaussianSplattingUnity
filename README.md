@@ -13,4 +13,4 @@ Right now it crashes.
 - [ ] Debugging (making it not crash/work)
 
       
-# Help wanted!
+## Contributions welcome
