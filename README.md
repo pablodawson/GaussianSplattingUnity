@@ -2,6 +2,7 @@
 Attempt at creating a 3D Gaussian Splatting visualizer in Unity, based on the Web visualizer by **https://github.com/cvlab-epfl/gaussian-splatting-web**
 Original work: https://github.com/graphdeco-inria/gaussian-splatting
 
+It uses **Graphics.RenderPrimitivesIndexed** to render Quads by GPU instancing
 - [x] Ply Loader and Data structure for Gaussians
 - [x] Rendering Quads in the GPU, in the repective Gaussian positions
 - [x] Definition of all methods
