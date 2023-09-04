@@ -26,12 +26,12 @@ Shader "Custom/SplattingDeg3"
             };
 
             static const float2 quadVertices[6] = {
+                float2(1.0, -1.0),
+                float2(-1.0, 1.0),
                 float2(-1.0, -1.0),
+                float2(1.0, 1.0),
                 float2(-1.0, 1.0),
-                float2(1.0, -1.0),
-                float2(1.0, -1.0),
-                float2(-1.0, 1.0),
-                float2(1.0, 1.0)
+                float2(1.0, -1.0)
             };
             
             StructuredBuffer<float3> Position;
@@ -40,9 +40,6 @@ Shader "Custom/SplattingDeg3"
             StructuredBuffer<float> Opacity;
             StructuredBuffer<float3> ShCoeffs;
             
-            uniform uint _BaseVertexIndex;
-            uniform float4x4 _ObjectToWorld;
-
             float focalX;
             float focalY;
             float tanFovX;
@@ -61,26 +58,26 @@ Shader "Custom/SplattingDeg3"
                 float3 scale = Scale[pointIndex];
                 float opacity = Opacity[pointIndex];
 
-
-                float3 cov2d = ComputeCov2D(pos, scale, rotQuat, focalX, focalY, tanFovX, tanFovY); //revisar
-
+                float3 cov2d = ComputeCov2D(pos, scale, rotQuat, focalX, focalY, tanFovX, tanFovY); // Probablemente malo esto
                 float det = cov2d.x * cov2d.z - cov2d.y * cov2d.y;
-
                 float det_inv = 1.0 / det;
                 float3 conic = float3(cov2d.z * det_inv, -cov2d.y * det_inv, cov2d.x * det_inv);
                 float mid = 0.5 * (cov2d.x + cov2d.z);
                 float lambda_1 = mid + sqrt(max(0.1, mid * mid - det));
                 float lambda_2 = mid - sqrt(max(0.1, mid * mid - det));
-                float radius_px = ceil(3. * sqrt(max(lambda_1, lambda_2)));
                 
-                float2 radius_ndc = float2(radius_px / (_ScreenParams.y), radius_px / (_ScreenParams.x)); //
-
                 o.conic_and_opacity = float4(conic, sigmoid(opacity));
-                
-                float4 projPosition = mul(UNITY_MATRIX_V, float4(pos,1));
-                projPosition = projPosition / projPosition.w;
-                
-                o.pos = mul(UNITY_MATRIX_P, float4(projPosition.xy + 2 * radius_ndc * quadOffset, projPosition.zw));
+
+                float lambda = abs(max(lambda_1, lambda_2));
+                //float test = ceil(3 * sqrt(lambda));
+                float radius_px = ceil(3 * sqrt(lambda));
+                //float radius_px = 10;
+
+                float2 radius_ndc = float2(radius_px / (float)_ScreenParams.x , radius_px / (float)_ScreenParams.y);
+
+                float4 projPosition = mul((float4x4)UNITY_MATRIX_VP, float4(pos,1));
+
+                o.pos = float4(projPosition.xy + 2 * radius_ndc * quadOffset, projPosition.zw);
 
                 uint shCount = 16;
 
@@ -91,14 +88,14 @@ Shader "Custom/SplattingDeg3"
                     _shCoeffs[i] = ShCoeffs[pointIndex * shCount + i];
                 }
 
-                float3 cam_position = (float3)(_WorldSpaceCameraPos);
+                float3 color = ComputeColorFromSH(pos, _shCoeffs);
 
-                float3 color = ComputeColorFromSH(pos, _shCoeffs); //revisar
+                float3 cam_position = (float3)(_WorldSpaceCameraPos);   
 
                 o.color = color;
 
                 o.uv = radius_px * quadOffset;
-                 
+                
                 return o;
 
             }
@@ -117,7 +114,7 @@ Shader "Custom/SplattingDeg3"
                 }
 
                 float alpha = min(0.99, opacity * exp(power));
-
+ 
                 return float4(i.color * alpha, alpha);
             }
             ENDCG

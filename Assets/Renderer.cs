@@ -12,6 +12,7 @@ public class Renderer : MonoBehaviour
     GraphicsBuffer indexBuffer;
     ComputeBuffer posBuffer, scaleBuffer, rotQuatBuffer, opacityBuffer, shCoeffsBuffer, gaussianBuffer;
     float focalX, focalY, tanFovX, tanFovY;
+    RenderParams rp;
 
     // Start is called before the first frame update
     void Start()
@@ -46,18 +47,24 @@ public class Renderer : MonoBehaviour
         // Camera params
         Camera mainCamera = Camera.main;
 
-        tanFovX = Mathf.Tan(mainCamera.fieldOfView * Mathf.Deg2Rad * 0.5f);
-        tanFovY = tanFovX / mainCamera.aspect;
-        
         float focalLengthPixels = Screen.height / (2.0f * Mathf.Tan(mainCamera.fieldOfView * 0.5f * Mathf.Deg2Rad));
         focalX = focalLengthPixels * Screen.width / Screen.height;
         focalY = focalLengthPixels;
 
+        tanFovX = 0.5f * Screen.width / focalX;
+        tanFovY = 0.5f * Screen.height / focalY;        
     }
     
     void OnDestroy()
     {
         indexBuffer?.Dispose();
+        
+        posBuffer?.Dispose();
+        scaleBuffer?.Dispose();
+        rotQuatBuffer?.Dispose();
+        opacityBuffer?.Dispose();
+        shCoeffsBuffer?.Dispose();
+        
     }
 
     void Update()
@@ -68,18 +75,18 @@ public class Renderer : MonoBehaviour
         if (_meshMaterial == null)
         {
             _meshMaterial = new Material(_gaussianShader);
+            
         }
 
-        RenderParams rp = new RenderParams(_meshMaterial);
-        rp.worldBounds = new Bounds(Vector3.zero, 10000 * Vector3.one); // use tighter bounds
+        rp = new RenderParams(_meshMaterial);
+        rp.worldBounds = new Bounds(Vector3.zero, 100 * Vector3.one); // use tighter bounds
 
         rp.matProps = new MaterialPropertyBlock();
 
         // Pass data to the shader
         rp.matProps.SetInt("SphericalHarmonicsDegree", gaussians.SphericalHarmonicsDegree);
         rp.matProps.SetInt("n_SphericalCoeff", gaussians.n_SphericalCoeff);
-        rp.matProps.SetMatrix("_ObjectToWorld", Matrix4x4.Translate(new Vector3(0, 0, 0)));
-
+        
         //Camera params
         rp.matProps.SetFloat("focalX", focalX);
         rp.matProps.SetFloat("focalY", focalY);

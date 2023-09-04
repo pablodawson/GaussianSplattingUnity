@@ -53,7 +53,7 @@ public class Gaussians
         }
 
         // Limit the number of gaussians
-        int maxGaussians = 20000;
+        int maxGaussians = 1000;
         NumGaussians = Math.Min(maxGaussians, NumGaussians);
 
         int vertexByteOffset = endHeaderIndex + "end_header".Length + 1;
