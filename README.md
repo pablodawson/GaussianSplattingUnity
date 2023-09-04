@@ -8,7 +8,7 @@ It currently crashes at init.
 - [x] Ply Loader and Data structure for storing Gaussians
 - [x] Rendering Quads via GPU instancing in the Gaussian positions
 - [x] Code Structure
-- [ ] Methods
+- [x] Methods
 - [ ] Sorting Gaussians by Depth
 - [ ] Fix bugs (making it not crash/work)
 
