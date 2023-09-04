@@ -3,14 +3,14 @@ Attempt at creating a 3D Gaussian Splatting visualizer in Unity, based on the We
 Original work: https://github.com/graphdeco-inria/gaussian-splatting
 
 It uses **Graphics.RenderPrimitivesIndexed** to render Quads by GPU instancing.
-Right now it crashes.
+It currently crashes at init.
 
-- [x] Ply Loader and Data structure for Gaussians
-- [x] Rendering Quads in the GPU, in the repective Gaussian positions
-- [x] Definition of all methods
-- [x] Basic Structure
+- [x] Ply Loader and Data structure for storing Gaussians
+- [x] Rendering Quads via GPU instancing in the Gaussian positions
+- [x] Code Structure
+- [x] Methods
 - [ ] Sorting Gaussians by Depth
-- [ ] Debugging (making it not crash/work)
+- [ ] Fix bugs (making it not crash/work)
 
       
 ## Contributions welcome
