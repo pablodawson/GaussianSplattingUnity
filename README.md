@@ -12,6 +12,3 @@ It currently crashes at init.
 - [x] Methods
 - [ ] Sorting Gaussians by Depth
 - [ ] Fix bugs (making it not crash/work)
-
-      
-## Contributions welcome
